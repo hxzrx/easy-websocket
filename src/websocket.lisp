@@ -1,6 +1,8 @@
 (in-package :easy-websocket)
 
+
 ;;; Special vars
+
 (defvar *app*)
 (setf (documentation '*app* 'variable)
       "Clack's app middle-ware")
@@ -8,10 +10,6 @@
 (defvar *handler*)
 (setf (documentation '*handler* 'variable)
       "Clack's handler for socket traffic")
-
-(defvar *on-connect-handler*)
-(setf (documentation '*on-connect-handler* 'variable)
-      "New connection event handler.")
 
 
 (defun websocket-server (on-open-handler on-message-handler on-error-handler on-close-handler env)
@@ -51,13 +49,12 @@
                                    (values 0 c)))))
         (lambda (responder)
           (declare (ignore responder))
-          (websocket-driver:start-connection ws :verify nil)))
+          (websocket-driver:start-connection ws)))
     (condition (c)
       (log:error "Condition caught in setting up the websocket-server - ~A.~&" c)
       (values 0 c))))
 
-(defun start-websocket-server (on-connect-handler
-                               on-open-handler
+(defun start-websocket-server (on-open-handler
                                on-message-handler
                                on-error-handler
                                on-close-handler
@@ -69,7 +66,7 @@
   "This function builds a clack app and then starts the webserver.
 Only websocket requests are allowed, which have upgrade/websocket record in the headers table,
 all other requests will be responded with code 403.
-on-connect-handler: function, accepts conn-id as its argument, used to initialize a new websocket connection.
+
 on-open-handler:    function, accepts conn-obj and the env as its arguments, used to listen to the open event.
 on-message-handler: function, accepts conn-obj and the conn-id as its arguments, used to listen to the message event.
 on-close-handler:   function, accepts conn-obj as its argument, used to listen to the close event.
@@ -77,8 +74,11 @@ host: the address this server will listen to.
 port: the port opened by this server
 server: should be recognized by clack, can be one of :woo, :hunchentoot, :fastcgi, :wookie, :toot, default to :woo.
 workers: the count of threads which will be used to fork the workers of the webserver.
+
+Note that the behaviors may not the same between different webservers.
+For example, for WOO server, sending messages to the client in on-open-handler will cache util there is a message event,
+however, this will not cache for HUNCHENTOOT.
 "
-  (setf *on-connect-handler* on-connect-handler)
   (setf *app* (lack:builder
                (lambda (app)
                  (lambda (env)
@@ -111,7 +111,6 @@ CLEANUP is a list of forms which should be processed along with this shutdown."
               (condition (c)
                 (log:error "The websocket server has stopped abnormally with condition <~s>" c)))
          ,@cleanup
-         (setf *on-connect-handler* nil)
          (setf *app* nil)
          (setf *handler* nil))
        (log:warn "The webserver is not running.")))

@@ -1,5 +1,6 @@
 ;;;; A full demo of websocket handlers.
 ;;;; Most of the code were copied from clog <https://github.com/rabbibotton/clog>
+;;;; The handler
 
 (in-package :easy-websocket)
 
@@ -22,6 +23,8 @@
 (defvar *query-time-out* 3
   "Number of seconds to timeout waiting for a query by default")
 
+(defvar *on-connect-handler* nil
+  "A hook which is used to initialize a new websocket connection.")
 
 (defun get-connection-object (conn-id)
   "Get the websocket object associated with CONN-ID."
@@ -93,10 +96,14 @@
                  (setf (gethash "conn-id" (get-connection-data new-id)) new-id)
                  (log:info "Send conn-id back for new conn: ~d." new-id)
                  (websocket-driver:send conn-obj (format nil "conn_id=~A" new-id))
+                 (websocket-driver:send conn-obj "1")
+                 (websocket-driver:send conn-obj "2")
+                 (websocket-driver:send conn-obj "3")
                  (bordeaux-threads:make-thread
                   (lambda ()
                     (handler-case
-                        (funcall *on-connect-handler* new-id)
+                        (when *on-connect-handler*
+                          (funcall *on-connect-handler* new-id))
                       (condition (c)
                         (log:error "Condition caught connection ~A - ~A." new-id c)
                         (values 0 c))))
@@ -214,9 +221,8 @@
 
 ;; start point
 #+:ignore
-(start-websocket-server (lambda (&rest args) (log:info "ON-CONNECT-HANDLER print, conn-id = ~s" (car args)))
-                        #'handle-new-connection
-                        ;;#'handle-message
+(start-websocket-server #'handle-new-connection
                         #'echo-message
                         #'handle-error
-                        #'handle-close-connection)
+                        #'handle-close-connection
+                        :server :hunchentoot)
