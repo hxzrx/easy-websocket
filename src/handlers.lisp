@@ -1,7 +1,65 @@
 (in-package :easy-websocket)
 
-
 ;; Websocket handlers
+
+(defvar *connection->id* (make-sync-hash-table)
+  "A map from websocket objects to their id strings")
+
+(defvar *id->connection* (make-sync-hash-table :test #'equal)
+  "A map from id strings to their corresponding websocket objects")
+
+(defvar *id->connection-data* (make-sync-hash-table :test #'equal)
+  "A map from id strings to their connection based data")
+
+(defvar *queries* (make-sync-hash-table)
+  "Query ID to Answers")
+
+(defvar *queries-sems* (make-sync-hash-table)
+  "Query ID to semiphores")
+
+(defvar *query-time-out* 3
+  "Number of seconds to timeout waiting for a query by default")
+
+
+(defun get-connection-object (conn-id)
+  "Get the websocket object associated with CONN-ID."
+  (declare (string conn-id))
+  (gethash conn-id *id->connection*))
+
+(defun get-connection-id (conn-object)
+  "Get the connection id string associated with the websocket object of CONN-OBJECT."
+  (declare (websocket-driver.ws.server:server conn-object))
+  (gethash conn-object *connection->id*))
+
+(defun get-connection-data (conn-id)
+  "Get the connection data associated with CONN-ID"
+  (declare (string conn-id))
+  (gethash conn-id *id->connection-data*))
+
+(defun remove-connection-object (conn-id)
+  "Remove the websocket object associated with CONN-ID."
+  (declare (string conn-id))
+  (remhash conn-id *id->connection*))
+
+(defun remove-connection-id (conn-object)
+  "Remove the connection id string associated with the websocket object of CONN-OBJECT."
+  (declare (websocket-driver.ws.server:server conn-object))
+  (remhash conn-object *connection->id*))
+
+(defun remove-connection-data (conn-id)
+  "Remove the connection data associated with CONN-ID."
+  (declare (string conn-id))
+  (remhash conn-id *id->connection-data*))
+
+(defun remove-connection (&key conn-id conn-object)
+  (declare (string conn-id))
+  (declare (websocket-driver.ws.server:server conn-object))
+  (clrhash (get-connection-data conn-id))
+  (remove-connection-object conn-id)
+  (remove-connection-id conn-object)
+  (remove-connection-data conn-id)
+  (log:info "Connection ~d has been removed." conn-id))
+
 
 (defun handle-new-connection (conn-obj env)
   "Handle new incoming websocket CONNECTIONS with ID from boot page."
@@ -117,6 +175,31 @@
     (condition (c)
       (log:error "Condition caught in handle-message - ~A.~&" c)
       (values 0 c))))
+
+
+(defun shutdown-websocket-server ()
+  (log:info "Websocket server is shutting down.")
+  (shutdown-server (loop for conn-data being the hash-values of *id->connection-data*
+                         do (clrhash conn-data))
+                   (clrhash *id->connection-data*)
+                   (clrhash *connection->id*)
+                   (clrhash *id->connection*)))
+
+;;; Helpers
+
+(defun inspect-connection (conn-id)
+  (let ((conn-data (gethash conn-id *id->connection-data*)))
+    (if conn-data
+        (format t "Connection ~s, result: ~d~%" conn-id conn-data)
+        (format t "Connection ~s, result: Not found!" conn-id))))
+
+(defun inspect-connections (&optional show-details-p)
+  (format t "The websocket server has ~d connections.~%" (hash-table-count *id->connection-data*))
+  (when show-details-p
+    (loop for conn-id being the hash-key
+            using (hash-value conn-data) of *id->connection-data*
+          do (format t "~d: ~d~%" conn-id conn-data))))
+
 
 #+:ignore
 (start-websocket-server (lambda (&rest args) (log:info "ON-CONNECT-HANDLER print, conn-id = ~s" (car args)))
