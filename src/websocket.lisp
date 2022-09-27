@@ -14,7 +14,7 @@
       "New connection event handler.")
 
 
-(defun websocket-server (on-open-handler on-message-handler on-close-handler env &optional wss-enable-p ca-path)
+(defun websocket-server (on-open-handler on-message-handler on-error-handler on-close-handler env)
   "Setup websocket server on ENV with OPEN, MESSAGE, CLOSE handlers."
   (declare (function on-open-handler on-message-handler on-close-handler)
            (list env))
@@ -34,6 +34,13 @@
                                  (condition (c)
                                    (log:error "Condition caught in websocket-server :message - ~A.~&" c)
                                    (values 0 c)))))
+        (websocket-driver:on :error ws
+                             (lambda (err)
+                               (handler-case
+                                   (funcall on-error-handler ws err)
+                                 (condition (c)
+                                   (log:error "Condition caught in websocket-server :error - ~A.~&" c)
+                                   (values 0 c)))))
         (websocket-driver:on :close ws
                              (lambda (&key code reason)
                                (declare (ignore code reason))
@@ -44,7 +51,7 @@
                                    (values 0 c)))))
         (lambda (responder)
           (declare (ignore responder))
-          (websocket-driver:start-connection ws)))
+          (websocket-driver:start-connection ws :verify nil)))
     (condition (c)
       (log:error "Condition caught in setting up the websocket-server - ~A.~&" c)
       (values 0 c))))
@@ -52,19 +59,20 @@
 (defun start-websocket-server (on-connect-handler
                                on-open-handler
                                on-message-handler
+                               on-error-handler
                                on-close-handler
                                &key
                                  (host    "0.0.0.0")
                                  (port    8080)
                                  (server  :woo)
-                                 (workers 4))
+                                 (workers 2))
   "This function builds a clack app and then starts the webserver.
 Only websocket requests are allowed, which have upgrade/websocket record in the headers table,
 all other requests will be responded with code 403.
 on-connect-handler: function, accepts conn-id as its argument, used to initialize a new websocket connection.
-on-open-handler:    function, accepts conn-obj and the env as its arguments, used to listen to the ws msg on open.
-on-message-handler: function, accepts conn-obj and the conn-id as its arguments, used to listen to the ws msg on message.
-on-close-handler:   function, accepts conn-obj as its argument, used to listen to the ws msg on close.
+on-open-handler:    function, accepts conn-obj and the env as its arguments, used to listen to the open event.
+on-message-handler: function, accepts conn-obj and the conn-id as its arguments, used to listen to the message event.
+on-close-handler:   function, accepts conn-obj as its argument, used to listen to the close event.
 host: the address this server will listen to.
 port: the port opened by this server
 server: should be recognized by clack, can be one of :woo, :hunchentoot, :fastcgi, :wookie, :toot, default to :woo.
@@ -82,7 +90,7 @@ workers: the count of threads which will be used to fork the workers of the webs
                          (prog1 '(403 (:content-type "text/plain") ("Forbidden!"))
                            (log:warn "The client tried to make a normal http connection to this websocket server."))))))
                (lambda (env)
-                 (websocket-server on-open-handler on-message-handler on-close-handler env))))
+                 (websocket-server on-open-handler on-message-handler on-error-handler on-close-handler env))))
   (setf *handler* (clack:clackup *app*
                                  :server server
                                  :address host
@@ -90,17 +98,20 @@ workers: the count of threads which will be used to fork the workers of the webs
                                  :debug nil
                                  :use-default-middlewares nil
                                  :worker-num workers))
-  (format t "Websocket server started at address \"~A:~A\" within webserver \"~d\" with ~d workers."
-          host port server workers))
+  (log:info "Websocket server started at address \"~A:~A\" within webserver \"~d\" with ~d workers."
+            host port server workers)
+  *handler*)
 
 (defmacro shutdown-server (&body cleanup)
   "Stop the websocket server and set *app* and *handler* to nil.
 CLEANUP is a list of forms which should be processed along with this shutdown."
-  `(unwind-protect
-        (handler-case (clack:stop *handler*)
-          (condition (c)
-            (log:error "The websocket server has stopped abnormally with condition <~s>" c)))
-     ,@cleanup
-     (setf *on-connect-handler* nil)
-     (setf *app* nil)
-     (setf *handler* nil)))
+  `(if *handler*
+       (unwind-protect
+            (handler-case (clack:stop *handler*)
+              (condition (c)
+                (log:error "The websocket server has stopped abnormally with condition <~s>" c)))
+         ,@cleanup
+         (setf *on-connect-handler* nil)
+         (setf *app* nil)
+         (setf *handler* nil))
+       (log:warn "The webserver is not running.")))
