@@ -11,10 +11,9 @@
 (setf (documentation '*handler* 'variable)
       "Clack's handler for socket traffic")
 
-
 (defun websocket-server (on-open-handler on-message-handler on-error-handler on-close-handler env)
   "Setup websocket server on ENV with OPEN, MESSAGE, CLOSE handlers."
-  (declare (function on-open-handler on-message-handler on-close-handler)
+  #+:ignore(declare (function on-open-handler on-message-handler on-close-handler)
            (list env))
   (handler-case
       (let ((ws (websocket-driver:make-server env)))
@@ -54,15 +53,15 @@
       (log:error "Condition caught in setting up the websocket-server - ~A.~&" c)
       (values 0 c))))
 
-(defun start-websocket-server (on-open-handler
-                               on-message-handler
-                               on-error-handler
-                               on-close-handler
-                               &key
-                                 (host    "0.0.0.0")
-                                 (port    8080)
-                                 (server  :woo)
-                                 (workers 2))
+(defun start (on-open-handler
+              on-message-handler
+              on-error-handler
+              on-close-handler
+              &key
+                (host    "0.0.0.0")
+                (port    8080)
+                (server  :hunchentoot)
+                (workers 2))
   "This function builds a clack app and then starts the webserver.
 Only websocket requests are allowed, which have upgrade/websocket record in the headers table,
 all other requests will be responded with code 403.
@@ -72,10 +71,10 @@ on-message-handler: function, accepts conn-obj and the conn-id as its arguments,
 on-close-handler:   function, accepts conn-obj as its argument, used to listen to the close event.
 host: the address this server will listen to.
 port: the port opened by this server
-server: should be recognized by clack, can be one of :woo, :hunchentoot, :fastcgi, :wookie, :toot, default to :woo.
+server: can be one of :hunchentoot, :woo, :wookie, default to :hunchentoot, bugs occurred for others.
 workers: the count of threads which will be used to fork the workers of the webserver.
 
-Note that the behaviors may not the same between different webservers.
+Note that the default webserver is hunchentoot, others still have bugs or strange behaviors.
 For example, for WOO server, sending messages to the client in on-open-handler will cache util there is a message event,
 however, this will not cache for HUNCHENTOOT.
 "
@@ -102,7 +101,7 @@ however, this will not cache for HUNCHENTOOT.
             host port server workers)
   *handler*)
 
-(defmacro shutdown-server (&body cleanup)
+(defmacro stop (&body cleanup)
   "Stop the websocket server and set *app* and *handler* to nil.
 CLEANUP is a list of forms which should be processed along with this shutdown."
   `(if *handler*
