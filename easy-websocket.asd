@@ -1,27 +1,20 @@
 (defsystem "easy-websocket"
-  :version "0.2.1"
+  :version "0.3.1"
   :description "A websocket-driver wrapper to make it easy to setup a websocket server."
   :author "He Xiang-zhi <xz.he@qq.com>"
   :license "MIT"
   :depends-on (:log4cl
-               :atomics
-               :cl-isaac
                :usocket
-               :bordeaux-threads
                :alexandria
-               :cl-ppcre
                :lack
                :clack
-               :websocket-driver
-               )
+               :websocket-driver)
   :in-order-to ((test-op (test-op "easy-websocket/tests")))
   :components ((:module "src"
                 :serial t
                 :components ((:file "packages")
-                             (:file "utils")
-                             (:file "websocket")
-                             ;;(:file "handlers")
-                             ))))
+                             (:file "websocket")))))
+
 
 (defsystem "easy-websocket/tests"
   :author "He Xiang-zhi <xz.he@qq.com>"
