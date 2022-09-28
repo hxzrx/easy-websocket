@@ -1,5 +1,5 @@
 (defsystem "easy-websocket"
-  :version "0.1.0"
+  :version "0.2.0"
   :description "A websocket-driver wrapper to make it easy to setup a websocket server."
   :author "He Xiang-zhi <xz.he@qq.com>"
   :license "MIT"
@@ -19,7 +19,8 @@
                 :components ((:file "packages")
                              (:file "utils")
                              (:file "websocket")
-                             (:file "handlers")))))
+                             ;;(:file "handlers")
+                             ))))
 
 (defsystem "easy-websocket/tests"
   :author "He Xiang-zhi <xz.he@qq.com>"
