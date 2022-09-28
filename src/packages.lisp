@@ -9,11 +9,11 @@
    :close-connection
    :version
    :protocol
-   :ready-state
-   )
+   :ready-state)
   (:export
    :*app*
    :*handler*
+   :random-port
    :start
    :stop
    ;; websocket-driver
@@ -24,5 +24,4 @@
    :close-connection
    :version
    :protocol
-   :ready-state
-   ))
+   :ready-state))
