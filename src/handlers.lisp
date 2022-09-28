@@ -1,13 +1,21 @@
 ;;;; A full demo of websocket handlers.
 ;;;; Most of the code were copied from clog <https://github.com/rabbibotton/clog>
 ;;;; This demo defines four handlers:
-;;;;   handle-new-connection for open event
-;;;;   handle-message for message event, and echo-message is an even simple example
-;;;;   handle-error for error event
-;;;;   handle-close-connection for close event
+;;;;   HANDLE-NEW-CONNECTION for open event,
+;;;;   HANDLE-MESSAGE for message event, and ECHO-MESSAGE is a simpler handler for message event,
+;;;;   HANDLE-ERROR for error event,
+;;;;   HANDLE-CLOSE-CONNECTION for close event.
 ;;;;
-;;;; These handlers can be used in practice (they've already used in clog in fact except handler-error),
-;;;; and only handle-message should be redefined according to your own message format.
+;;;; These handlers can be used in products (they've been already used in Clog except HANDLER-ERROR),
+;;;; and only HANDLE-MESSAGE should be redefined according to your own message format.
+;;;;
+;;;; An html src is also put in the #|...|# comment in the end of this file,
+;;;; it will display all messages sending from the websocket server.
+;;;; This html src is from The Common Lisp Cookbook in <https://lispcookbook.github.io/cl-cookbook/websockets.html>.
+;;;; Save the src into an html file, change the ws address to your websocket address,
+;;;; then open it with a web browser and see what will be displayed.
+;;;;
+;;;; Hope it will be a good starting point to develop a websocket application.
 
 
 (in-package :easy-websocket)
@@ -233,3 +241,44 @@
        :server :hunchentoot)
 
 ;; (stop-server)
+
+
+;; https://lispcookbook.github.io/cl-cookbook/websockets.html
+#|
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <title>LISP-CHAT</title>
+  </head>
+  <body>
+    <ul id="chat-echo-area">
+    </ul>
+    <div style="position:fixed; bottom:0;">
+      <input id="chat-input" placeholder="say something" >
+    </div>
+    <script>
+      window.onload = function () {
+          const inputField = document.getElementById("chat-input");
+          function receivedMessage(msg) {
+              let li = document.createElement("li");
+              li.textContent = msg.data;
+              console.log("received a msg: ", msg.data)
+              document.getElementById("chat-echo-area").appendChild(li);
+          }
+          const ws = new WebSocket("ws://192.168.182.132:8080");
+          ws.addEventListener('message', receivedMessage);
+
+          inputField.addEventListener("keyup", (evt) => {
+              if (evt.key === "Enter") {
+                  ws.send(evt.target.value);
+                  evt.target.value = "";
+              }
+          });
+      };
+    </script>
+  </body>
+</html>
+
+|#
