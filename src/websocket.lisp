@@ -1,6 +1,17 @@
 (in-package :easy-websocket)
 
 
+;;; utils
+
+(defun random-port (&key (host "0.0.0.0")) ; clog/source/clog-connection.lisp
+  "Return a random open port on host.
+Note that the port number returned by this function might be unavailable when using it."
+  (let* ((listen (usocket:socket-listen host 0))
+         (port (usocket:get-local-port listen)))
+    (usocket:socket-close listen)
+    port))
+
+
 ;;; Special vars
 
 (defvar *app* nil
@@ -9,7 +20,10 @@
 (defvar *handler* nil
   "Http handler of Clack")
 
-(defun websocket-server (on-open-handler on-message-handler on-error-handler on-close-handler env)
+
+;;; Server
+
+(defun setup-server (on-open-handler on-message-handler on-error-handler on-close-handler env)
   "Setup websocket server on ENV with OPEN, MESSAGE, ERROR and CLOSE handlers."
   (handler-case
       (let ((ws (websocket-driver:make-server env)))
@@ -18,21 +32,21 @@
                                (handler-case
                                    (funcall on-open-handler ws env)
                                  (condition (c)
-                                   (log:error "Condition caught in websocket-server :open - ~A.~&" c)
+                                   (log:error "Setup-server condition on :open with <~A>" c)
                                    (values 0 c)))))
         (websocket-driver:on :message ws
                              (lambda (msg)
                                (handler-case
                                    (funcall on-message-handler ws msg)
                                  (condition (c)
-                                   (log:error "Condition caught in websocket-server :message - ~A.~&" c)
+                                   (log:error "Setup-server condition on :message with <~A>" c)
                                    (values 0 c)))))
         (websocket-driver:on :error ws
                              (lambda (err)
                                (handler-case
                                    (funcall on-error-handler ws err)
                                  (condition (c)
-                                   (log:error "Condition caught in websocket-server :error - ~A.~&" c)
+                                   (log:error "Setup-server condition on :error with <~A>" c)
                                    (values 0 c)))))
         (websocket-driver:on :close ws
                              (lambda (&key code reason)
@@ -40,13 +54,13 @@
                                (handler-case
                                    (funcall on-close-handler ws)
                                  (condition (c)
-                                   (log:error "Condition caught in websocket-server :close - ~A.~&" c)
+                                   (log:error "Setup-server condition on :close with <~A>" c)
                                    (values 0 c)))))
         (lambda (responder)
           (declare (ignore responder))
           (websocket-driver:start-connection ws)))
     (condition (c)
-      (log:error "Condition caught in setting up the websocket-server - ~A.~&" c)
+      (log:error "Setup-server condition when initializing the server with <~A>" c)
       (values 0 c))))
 
 (defun start (on-open-handler
@@ -87,7 +101,7 @@ however, this will not cache for HUNCHENTOOT.
                          (prog1 '(403 (:content-type "text/plain") ("Forbidden!"))
                            (log:warn "The client tried to make a normal http connection to this websocket server."))))))
                (lambda (env)
-                 (websocket-server on-open-handler on-message-handler on-error-handler on-close-handler env))))
+                 (setup-server on-open-handler on-message-handler on-error-handler on-close-handler env))))
   (setf *handler* (apply #'clack:clackup
                          *app*
                          :server server
