@@ -212,6 +212,7 @@
 ;; A very simple handler for :messagen event
 (defun echo-message (conn-obj message)
   "Send the message back to the client"
+  (format t "Message received and send back: <~s>~%" message)
   (websocket-driver:send conn-obj message))
 
 (defun handle-message (conn-obj message)
