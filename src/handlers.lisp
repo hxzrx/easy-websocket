@@ -1,6 +1,14 @@
 ;;;; A full demo of websocket handlers.
 ;;;; Most of the code were copied from clog <https://github.com/rabbibotton/clog>
-;;;; The handler
+;;;; This demo defines four handlers:
+;;;;   handle-new-connection for open event
+;;;;   handle-message for message event, and echo-message is an even simple example
+;;;;   handle-error for error event
+;;;;   handle-close-connection for close event
+;;;;
+;;;; These handlers can be used in practice (they've already used in clog in fact except handler-error),
+;;;; and only handle-message should be redefined according to your own message format.
+
 
 (in-package :easy-websocket)
 
@@ -96,9 +104,6 @@
                  (setf (gethash "conn-id" (get-connection-data new-id)) new-id)
                  (log:info "Send conn-id back for new conn: ~d." new-id)
                  (websocket-driver:send conn-obj (format nil "conn_id=~A" new-id))
-                 (websocket-driver:send conn-obj "1")
-                 (websocket-driver:send conn-obj "2")
-                 (websocket-driver:send conn-obj "3")
                  (bordeaux-threads:make-thread
                   (lambda ()
                     (handler-case
@@ -194,13 +199,13 @@
       (log:error "Condition caught in handle-close-connection - ~A." c)
       (values 0 c))))
 
-(defun shutdown-websocket-server ()
+(defun stop-server ()
   (log:info "Websocket server is shutting down.")
-  (shutdown-server (loop for conn-data being the hash-values of *id->connection-data*
-                         do (clrhash conn-data))
-                   (clrhash *id->connection-data*)
-                   (clrhash *connection->id*)
-                   (clrhash *id->connection*)))
+  (stop (loop for conn-data being the hash-values of *id->connection-data*
+              do (clrhash conn-data))
+        (clrhash *id->connection-data*)
+        (clrhash *connection->id*)
+        (clrhash *id->connection*)))
 
 
 ;;; Helpers
@@ -220,9 +225,11 @@
 
 
 ;; start point
-#+:ignore
-(start-websocket-server #'handle-new-connection
-                        #'echo-message
-                        #'handle-error
-                        #'handle-close-connection
-                        :server :hunchentoot)
+(start 'handle-new-connection
+       ;;'handle-message
+       'echo-message
+       'handle-error
+       'handle-close-connection
+       :server :hunchentoot)
+
+;; (stop-server)
