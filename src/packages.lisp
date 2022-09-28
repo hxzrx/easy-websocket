@@ -1,15 +1,28 @@
 (defpackage :easy-websocket
   (:use :cl)
+  (:import-from
+   :websocket-driver
+   :send
+   :send-text
+   :send-binary
+   :send-ping
+   :close-connection
+   :version
+   :protocol
+   :ready-state
+   )
   (:export
    :*app*
-   :*client-handler*
-   ;; websocket
-   :start-websocket-server
-   :shutdown-websocket-server
-   :inspect-connection
-   :inspect-connections
-   ;; handlers
-   :handle-new-connection
-   :handle-message
-   :handle-close-connection
+   :*handler*
+   :start
+   :stop
+   ;; websocket-driver
+   :send
+   :send-text
+   :send-binary
+   :send-ping
+   :close-connection
+   :version
+   :protocol
+   :ready-state
    ))
