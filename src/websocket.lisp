@@ -3,18 +3,14 @@
 
 ;;; Special vars
 
-(defvar *app*)
-(setf (documentation '*app* 'variable)
-      "Clack's app middle-ware")
+(defvar *app* nil
+  "App middleware of Clack")
 
-(defvar *handler*)
-(setf (documentation '*handler* 'variable)
-      "Clack's handler for socket traffic")
+(defvar *handler* nil
+  "Http handler of Clack")
 
 (defun websocket-server (on-open-handler on-message-handler on-error-handler on-close-handler env)
-  "Setup websocket server on ENV with OPEN, MESSAGE, CLOSE handlers."
-  #+:ignore(declare (function on-open-handler on-message-handler on-close-handler)
-           (list env))
+  "Setup websocket server on ENV with OPEN, MESSAGE, ERROR and CLOSE handlers."
   (handler-case
       (let ((ws (websocket-driver:make-server env)))
         (websocket-driver:on :open ws
@@ -57,12 +53,14 @@
               on-message-handler
               on-error-handler
               on-close-handler
+              &rest args
               &key
                 (host    "0.0.0.0")
                 (port    8080)
                 (server  :hunchentoot)
-                (workers 2))
-  "This function builds a clack app and then starts the webserver.
+                (workers 2)
+                &allow-other-keys)
+  "Builds a clack app and then starts the webserver.
 Only websocket requests are allowed, which have upgrade/websocket record in the headers table,
 all other requests will be responded with code 403.
 
@@ -90,13 +88,15 @@ however, this will not cache for HUNCHENTOOT.
                            (log:warn "The client tried to make a normal http connection to this websocket server."))))))
                (lambda (env)
                  (websocket-server on-open-handler on-message-handler on-error-handler on-close-handler env))))
-  (setf *handler* (clack:clackup *app*
-                                 :server server
-                                 :address host
-                                 :port port
-                                 :debug nil
-                                 :use-default-middlewares nil
-                                 :worker-num workers))
+  (setf *handler* (apply #'clack:clackup
+                         *app*
+                         :server server
+                         :address host
+                         :port port
+                         :debug nil
+                         :use-default-middlewares nil
+                         :worker-num workers
+                         (alexandria:delete-from-plist args :server :address :port :debug :use-default-middlewares :worker-num)))
   (log:info "Websocket server started at address \"~A:~A\" within webserver \"~d\" with ~d workers."
             host port server workers)
   *handler*)
@@ -105,11 +105,13 @@ however, this will not cache for HUNCHENTOOT.
   "Stop the websocket server and set *app* and *handler* to nil.
 CLEANUP is a list of forms which should be processed along with this shutdown."
   `(if *handler*
-       (unwind-protect
-            (handler-case (clack:stop *handler*)
-              (condition (c)
-                (log:error "The websocket server has stopped abnormally with condition <~s>" c)))
-         ,@cleanup
-         (setf *app* nil)
-         (setf *handler* nil))
-       (log:warn "The webserver is not running.")))
+       (prog1 t
+         (unwind-protect
+              (handler-case (clack:stop *handler*)
+                (condition (c)
+                  (log:error "The websocket server has stopped abnormally with condition <~s>" c)))
+           ,@cleanup
+           (setf *app* nil)
+           (setf *handler* nil)))
+       (prog1 nil
+         (log:warn "The webserver is not running."))))
