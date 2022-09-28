@@ -1,5 +1,5 @@
 (defsystem "easy-websocket"
-  :version "0.2.0"
+  :version "0.2.1"
   :description "A websocket-driver wrapper to make it easy to setup a websocket server."
   :author "He Xiang-zhi <xz.he@qq.com>"
   :license "MIT"
@@ -8,6 +8,7 @@
                :cl-isaac
                :usocket
                :bordeaux-threads
+               :alexandria
                :cl-ppcre
                :lack
                :clack
