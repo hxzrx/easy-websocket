@@ -20,6 +20,8 @@ Builds a `clack` app and then starts the webserver. Only websocket requests are 
 
 * `on-message-handler`: function, accepts conn-obj and the conn-id as its arguments, used to listen to the message event.
 
+* `on-error-handler`:   function, accepts an error object as its argument, used to handle the error.
+
 * `on-close-handler`:   function, accepts conn-obj as its argument, used to listen to the close event.
 
 * `host`: the address this server will listen to.
@@ -29,6 +31,8 @@ Builds a `clack` app and then starts the webserver. Only websocket requests are 
 * `server`: can be one of :hunchentoot, :woo, :wookie, default to :hunchentoot, bugs occurred for others.
 
 * `workers`: the count of threads which will be used to fork the workers of the webserver.
+
+`on-open-handler`, `on-error-handler` and `on-close-handler` can be nil to ignore the respect events.
 
 Note that the default webserver is `:hunchentoot`, others may have bugs or strange behaviors. For example, for `WOO` server, if we send a message to conn-obj in another thread, the connection will be closed.
 
