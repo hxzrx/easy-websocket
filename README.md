@@ -83,4 +83,4 @@ Returns the connection state as a keyword, which is one of `:connecting`, `:open
 
 ## Author
 
-He Xiang-zhi <xz.he@qq.com>
+He Xiang-zhi (xz.he@qq.com)
