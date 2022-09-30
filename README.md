@@ -8,7 +8,7 @@ A [`websocket-driver`](https://github.com/fukamachi/websocket-driver) wrapper to
 
 ## Usage
 
-There is a full demo in the file `src/example.lisp`. Most of the server code were copied from [Clog](https://github.com/rabbibotton/clog) with little modification, and the client html src was adapted from [The Common Lisp Cookbook](https://lispcookbook.github.io/cl-cookbook/websockets.html).
+There is a full demo in the file `src/example.lisp`. Most of the server code were copied from [Clog](https://github.com/rabbibotton/clog) with some modifications, and the client html src was adapted from [The Common Lisp Cookbook](https://lispcookbook.github.io/cl-cookbook/websockets.html).
 
 ## APIs
 
