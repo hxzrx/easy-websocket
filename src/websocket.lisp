@@ -27,13 +27,14 @@ Note that the port number returned by this function might be unavailable when us
   "Setup websocket server on ENV with OPEN, MESSAGE, ERROR and CLOSE handlers."
   (handler-case
       (let ((ws (websocket-driver:make-server env)))
-        (websocket-driver:on :open ws
-                             (lambda ()
-                               (handler-case
-                                   (funcall on-open-handler ws env)
-                                 (condition (c)
-                                   (log:error "Setup-server condition on :open with <~A>" c)
-                                   (values 0 c)))))
+        (when on-open-handler
+          (websocket-driver:on :open ws
+                               (lambda ()
+                                 (handler-case
+                                     (funcall on-open-handler ws env)
+                                   (condition (c)
+                                     (log:error "Setup-server condition on :open with <~A>" c)
+                                     (values 0 c))))))
         (websocket-driver:on :message ws
                              (lambda (msg)
                                (handler-case
@@ -41,21 +42,23 @@ Note that the port number returned by this function might be unavailable when us
                                  (condition (c)
                                    (log:error "Setup-server condition on :message with <~A>" c)
                                    (values 0 c)))))
-        (websocket-driver:on :error ws
-                             (lambda (err)
-                               (handler-case
-                                   (funcall on-error-handler ws err)
-                                 (condition (c)
-                                   (log:error "Setup-server condition on :error with <~A>" c)
-                                   (values 0 c)))))
-        (websocket-driver:on :close ws
-                             (lambda (&key code reason)
-                               (declare (ignore code reason))
-                               (handler-case
-                                   (funcall on-close-handler ws)
-                                 (condition (c)
-                                   (log:error "Setup-server condition on :close with <~A>" c)
-                                   (values 0 c)))))
+        (when on-error-handler
+          (websocket-driver:on :error ws
+                               (lambda (err)
+                                 (handler-case
+                                     (funcall on-error-handler ws err)
+                                   (condition (c)
+                                     (log:error "Setup-server condition on :error with <~A>" c)
+                                     (values 0 c))))))
+        (when on-close-handler
+          (websocket-driver:on :close ws
+                               (lambda (&key code reason)
+                                 (declare (ignore code reason))
+                                 (handler-case
+                                     (funcall on-close-handler ws)
+                                   (condition (c)
+                                     (log:error "Setup-server condition on :close with <~A>" c)
+                                     (values 0 c))))))
         (lambda (responder)
           (declare (ignore responder))
           (websocket-driver:start-connection ws)))
@@ -80,11 +83,14 @@ all other requests will be responded with code 403.
 
 on-open-handler:    function, accepts conn-obj and the env as its arguments, used to listen to the open event.
 on-message-handler: function, accepts conn-obj and the conn-id as its arguments, used to listen to the message event.
+on-error-handler:   function, accepts an error object as its argument, used to handle the error.
 on-close-handler:   function, accepts conn-obj as its argument, used to listen to the close event.
 host: the address this server will listen to.
 port: the port opened by this server
 server: can be one of :hunchentoot, :woo, :wookie, default to :hunchentoot, bugs occurred for others.
 workers: the count of threads which will be used to fork the workers of the webserver.
+
+on-open-handler, on-error-handler and on-close-handler can be nil to ignore the respect events.
 
 Note that the default webserver is hunchentoot, others still have bugs or strange behaviors.
 For example, for WOO server, sending messages to the client in on-open-handler will cache util there is a message event,
@@ -136,10 +142,14 @@ CLIENT is some symbol that will bind to a websocket client object, and it should
 ADDRESS: a websocket address string such as \"ws://127.0.0.1:8080\".
 ON-MESSAGE-HANDLER: a unary function to handler the incoming messages, its sole argument is the message object.
 BODY: a list of forms.
+
+It seems that the server could not listen to the close event!
 "
   `(let ((,client (websocket-driver:make-client ,address)))
+     (websocket-driver:on :message ,client
+                          ,on-message-handler)
      (websocket-driver:start-connection ,client)
-                       (websocket-driver:on :message ,client
-                                            ,on-message-handler)
      (unwind-protect  (progn ,@body)
+       ;; close-connection did not send close frame to the server
+       (websocket-driver:send ,client "" :type :close)
        (websocket-driver:close-connection ,client))))
