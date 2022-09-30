@@ -151,5 +151,5 @@ It seems that the server could not listen to the close event!
      (websocket-driver:start-connection ,client)
      (unwind-protect  (progn ,@body)
        ;; close-connection did not send close frame to the server
-       (websocket-driver:send ,client "" :type :close)
+       (websocket-driver.ws.base::send-close-frame ,client "" 1000) ;(websocket-driver:send ,client "" :type :close)
        (websocket-driver:close-connection ,client))))

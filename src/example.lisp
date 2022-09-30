@@ -327,7 +327,7 @@
 
 (easy-websocket:with-client client "ws://127.0.0.1:8080" #'(lambda (message)
                                                              (format t "~&Client received: ~A~%" message))
-  (send client "Hello server!")
+  (easy-websocket:send client "Hello server!")
   (sleep 0.1)) ; sleep so that the msg will be printed
 
 ;; (stop-server)
