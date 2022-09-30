@@ -98,7 +98,7 @@ however, this will not cache for HUNCHENTOOT.
                    (let ((headers (getf env :headers)))
                      (if (equal "websocket" (gethash "upgrade" headers))
                          (funcall app env)
-                         (prog1 '(403 (:content-type "text/plain") ("Forbidden!"))
+                         (prog1 '(403 (:content-type "text/plain") ("")) ; forbide other requests than websocket
                            (log:warn "The client tried to make a normal http connection to this websocket server."))))))
                (lambda (env)
                  (setup-server on-open-handler on-message-handler on-error-handler on-close-handler env))))
@@ -129,3 +129,17 @@ CLEANUP is a list of forms which should be processed along with this shutdown."
            (setf *handler* nil)))
        (prog1 nil
          (log:warn "The webserver is not running."))))
+
+(defmacro with-client (client address on-message-handler &body body)
+  "Make a webscoket client and do what you want to, the connection will be closed after you've done the jobs.
+CLIENT is some symbol that will bind to a websocket client object, and it should be used in BODY.
+ADDRESS: a websocket address string such as \"ws://127.0.0.1:8080\".
+ON-MESSAGE-HANDLER: a unary function to handler the incoming messages, its sole argument is the message object.
+BODY: a list of forms.
+"
+  `(let ((,client (websocket-driver:make-client ,address)))
+     (websocket-driver:start-connection ,client)
+                       (websocket-driver:on :message ,client
+                                            ,on-message-handler)
+     (unwind-protect  (progn ,@body)
+       (websocket-driver:close-connection ,client))))

@@ -16,6 +16,7 @@
    :random-port
    :start
    :stop
+   :with-client
    ;; websocket-driver
    :send
    :send-text
