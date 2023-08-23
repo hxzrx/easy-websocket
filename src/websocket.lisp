@@ -1,17 +1,6 @@
 (in-package :easy-websocket)
 
 
-;;; utils
-
-(defun random-port (&key (host "0.0.0.0")) ; clog/source/clog-connection.lisp
-  "Return a random open port on host.
-Note that the port number returned by this function might be unavailable when using it."
-  (let* ((listen (usocket:socket-listen host 0))
-         (port (usocket:get-local-port listen)))
-    (usocket:socket-close listen)
-    port))
-
-
 ;;; Special vars
 
 (defvar *app* nil

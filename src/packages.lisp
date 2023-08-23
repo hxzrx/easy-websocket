@@ -13,7 +13,6 @@
   (:export
    :*app*
    :*handler*
-   :random-port
    :start
    :stop
    :with-client
