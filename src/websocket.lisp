@@ -104,7 +104,7 @@ For example, for WOO server, sending messages to the client in on-open-handler w
 however, this will not cache for HUNCHENTOOT.
 "
   (setf *app* (lack:builder
-               ;; filter request
+               ;; verify request
                (lambda (app)
                  (lambda (env)
                    (log:info "A remote host \"~d:~d\" tries to make request for uri \"~d\"."
@@ -114,19 +114,18 @@ however, this will not cache for HUNCHENTOOT.
                        (prog1 '(400 (:content-type "text/plain") ("404 Not Found!"))
                          (log:warn "A remote host \"~d\" tried to make a request but with invalid uri \"~d\"."
                                    (getf env :REMOTE-ADDR) (getf env :REQUEST-URI)))
-                       (let ((headers (getf env :headers)))
-                         ;; verify websocket request
-                         (if (equal "websocket" (gethash "upgrade" headers))
-                             ;; the url has the fmt such as "ws://localhost/ws?r=conn_id" where conn_id should be verified
-                             (if request-verifier
-                                 (if (funcall request-verifier env)
-                                     (funcall app env)
-                                     (prog1 '(403 (:content-type "text/plain") ("403 Forbidden!"))
-                                       (log:warn "Failed to verify the websocket connection request.")))
-                                 (funcall app env))
-                             (prog1 '(404 (:content-type "text/plain") ("404 Not Found!"))
-                               (log:warn "The remote host \"~d\" tried to make a normal http request."
-                                         (getf env :REMOTE-ADDR))))))))
+                       ;; verify websocket request
+                       (if (equal "websocket" (gethash "upgrade" (getf env :headers)))
+                           ;; the url has the fmt such as "ws://localhost/ws?r=conn_id" where conn_id should be verified
+                           (if request-verifier
+                               (if (funcall request-verifier env)
+                                   (funcall app env)
+                                   (prog1 '(403 (:content-type "text/plain") ("403 Forbidden!"))
+                                     (log:warn "Failed to verify the websocket connection request.")))
+                               (funcall app env))
+                           (prog1 '(404 (:content-type "text/plain") ("404 Not Found!"))
+                             (log:warn "The remote host \"~d\" tried to make a normal http request."
+                                       (getf env :REMOTE-ADDR)))))))
                ;; handle websocket
                (lambda (env)
                  (handle-websocket-connection on-open-handler on-message-handler on-error-handler on-close-handler env))))
