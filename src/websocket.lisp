@@ -81,11 +81,10 @@ provided PLIST."
                 (server  :hunchentoot)
                 (workers 2)
                 request-verifier
-                http-handler
               &allow-other-keys)
   "Builds a clack app and then starts the webserver.
 Only websocket requests are allowed, which have upgrade/websocket record in the headers table,
-all other requests will be responded with code 403.
+other requests will be responded with code 403.
 
 on-open-handler:    function, accepts conn-obj and the env as its arguments, used to listen to the open event.
 on-message-handler: function, accepts conn-obj and the conn-id as its arguments, used to listen to the message event.
@@ -93,11 +92,10 @@ on-error-handler:   function, accepts an error object as its argument, used to h
 on-close-handler:   function, accepts conn-obj as its argument, used to listen to the close event.
 host: the address this server will listen to.
 port: the port opened by this server
-uri: if not NULL, the request uri should match this arg, case insensitive.
+uri: if not NULL, the requested uri should match this arg, case insensitive.
 server: can be one of :hunchentoot, :woo, :wookie, default to :hunchentoot, bugs occurred for others.
 workers: the count of threads which will be used to fork the workers of the webserver.
-request-verifier: a unary function and pass env to check the request. This function will be called if it's provided.
-http-handler: a unary function and pass env to serve the normal http requests. This function will be called if it's provided.
+request-verifier: function or NULL, the function accepts the `env` and check the request, a 403 response will be sent if this check failed. This function will be called if provided.
 
 on-open-handler, on-error-handler and on-close-handler can be nil to ignore the respect events.
 
@@ -111,26 +109,24 @@ however, this will not cache for HUNCHENTOOT.
                  (lambda (env)
                    (log:info "A remote host \"~d:~d\" tries to make request for uri \"~d\"."
                              (getf env :REMOTE-ADDR) (getf env :REMOTE-PORT) (getf env :REQUEST-URI))
-                   (if (and uri (not (string-equal uri (getf env :REQUEST-URI)))) ; verify uri, case insensitive
+                   ;; verify uri, case insensitive
+                   (if (and uri (not (string-equal uri (getf env :REQUEST-URI))))
                        (prog1 '(400 (:content-type "text/plain") ("404 Not Found!"))
                          (log:warn "A remote host \"~d\" tried to make a request but with invalid uri \"~d\"."
                                    (getf env :REMOTE-ADDR) (getf env :REQUEST-URI)))
                        (let ((headers (getf env :headers)))
+                         ;; verify websocket request
                          (if (equal "websocket" (gethash "upgrade" headers))
-                             ;; check if there's a request verify function in the args
+                             ;; the url has the fmt such as "ws://localhost/ws?r=conn_id" where conn_id should be verified
                              (if request-verifier
-                                 ;; the url has the fmt such as "ws://localhost/ws?r=conn_id" where conn_id should be verified
                                  (if (funcall request-verifier env)
                                      (funcall app env)
                                      (prog1 '(403 (:content-type "text/plain") ("403 Forbidden!"))
                                        (log:warn "Failed to verify the websocket connection request.")))
                                  (funcall app env))
-                             ;; this server doesn't deserve to serve http requests,
-                             ;; however, the http-handler parameter gives a chance to serve normal http requests.
-                             (if http-handler
-                                 (funcall http-handler env)
-                                 (prog1 '(403 (:content-type "text/plain") ("403 Forbidden!")) ; forbide other requests than websocket
-                                   (log:warn "The client tried to make a normal http connection to this websocket server."))))))))
+                             (prog1 '(404 (:content-type "text/plain") ("404 Not Found!"))
+                               (log:warn "The remote host \"~d\" tried to make a normal http request."
+                                         (getf env :REMOTE-ADDR))))))))
                ;; handle websocket
                (lambda (env)
                  (handle-websocket-connection on-open-handler on-message-handler on-error-handler on-close-handler env))))
