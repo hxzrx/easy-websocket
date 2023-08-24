@@ -4,8 +4,6 @@
   :author "He Xiang-zhi <xz.he@qq.com>"
   :license "MIT"
   :depends-on (:log4cl
-               :usocket
-               :alexandria
                :lack
                :clack
                :websocket-driver)
