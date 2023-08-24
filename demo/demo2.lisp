@@ -130,44 +130,15 @@
 (defvar *on-connect-handler* nil
   "A hook which is used to initialize a new websocket connection.")
 
-(defun get-connection-object (conn-id)
-  "Get the websocket object associated with CONN-ID."
+
+(defun remove-connection (conn-id)
   (declare (string conn-id))
-  (gethash conn-id *id->connection*))
-
-(defun get-connection-id (conn-object)
-  "Get the connection id string associated with the websocket object of CONN-OBJECT."
-  (declare (websocket-driver.ws.server:server conn-object))
-  (gethash conn-object *connection->id*))
-
-(defun get-connection-data (conn-id)
-  "Get the connection data associated with CONN-ID"
-  (declare (string conn-id))
-  (gethash conn-id *id->connection-data*))
-
-(defun remove-connection-object (conn-id)
-  "Remove the websocket object associated with CONN-ID."
-  (declare (string conn-id))
-  (remhash conn-id *id->connection*))
-
-(defun remove-connection-id (conn-object)
-  "Remove the connection id string associated with the websocket object of CONN-OBJECT."
-  (declare (websocket-driver.ws.server:server conn-object))
-  (remhash conn-object *connection->id*))
-
-(defun remove-connection-data (conn-id)
-  "Remove the connection data associated with CONN-ID."
-  (declare (string conn-id))
-  (remhash conn-id *id->connection-data*))
-
-(defun remove-connection (conn-id conn-object)
-  (declare (string conn-id))
-  (declare (websocket-driver.ws.server:server conn-object))
-  (clrhash (get-connection-data conn-id))
-  (remove-connection-object conn-id)
-  (remove-connection-id conn-object)
-  (remove-connection-data conn-id)
+  (clrhash (gethash conn-id *id->connection-data*))
+  (remhash (gethash conn-id *id->connection*) *connection->id*)
+  (remhash conn-id  *id->connection*)
+  (remhash conn-id  *id->connection-data*)
   (log:info "Connection <~d> has been removed." conn-id))
+
 
 ;; handlers
 
@@ -179,16 +150,18 @@
          (items   (when query (quri:url-decode-params query)))
          (conn-id (when items (cdr (assoc "r" items :test #'equalp)))))
     (handler-case
-        (cond ((and conn-id (gethash conn-id *id->connection-data*))
+        (cond ((and conn-id (gethash conn-id *id->connection*))
                (log:info "Reconnection id - ~A to ~A." conn-id conn-obj)
                (handler-case
-                   (websocket-driver:close-connection (gethash conn-id *connection->id*)
-                                                      "Aborting this old connection since receiving a reconnection request.")
+                   (progn
+                     (remhash (gethash conn-id *id->connection*) *connection->id*)
+                     (websocket-driver:close-connection (gethash conn-id *connection->id*)
+                                                        "Aborting this old connection since receiving a reconnection request."))
                  (condition (c)
                    (log:error "Failed to close the old connection when establishing reconnection. This can be normal: The old connection could probably don't work for the client, so the client is requesting to reconnect.~%Condition - ~A."
                               c)))
-               (setf (gethash conn-id *connection->id*) conn-obj)
-               (setf (gethash conn-obj *id->connection*) conn-id))
+               (setf (gethash conn-id *id->connection*) conn-obj)
+               (setf (gethash conn-obj *connection->id*) conn-id))
               (conn-id
                (log:info "Reconnection id ~A not found. Closing the connection." conn-id)
                (websocket-driver:close-connection conn-obj)) ; Don't send the reason for better security.
@@ -198,7 +171,7 @@
                  (setf (gethash new-id *id->connection*) conn-obj)
                  (setf (gethash new-id *id->connection-data*)
                        (make-sync-hash-table :test #'equal))
-                 (setf (gethash "conn-id" (get-connection-data new-id)) new-id)
+                 (setf (gethash "conn-id" (gethash new-id *id->connection-data*)) new-id)
                  (log:info "Send conn-id back for new conn: ~d." new-id)
                  (websocket-driver:send conn-obj (conspack:encode (format nil "conn_id=~A" new-id)))
                  (bordeaux-threads:make-thread
@@ -251,10 +224,9 @@
                  (bordeaux-threads:make-thread
                   (lambda ()
                     (handler-case
-                        (let* ((event-hash (get-connection-data conn-id))
+                        (let* ((event-hash (gethash conn-id *id->connection-data*))
                                (event      (when event-hash
-                                             (gethash event-id
-                                                      event-hash))))
+                                             (gethash event-id event-hash))))
                           (when event
                             (funcall event data)))
                       (condition (c)
@@ -286,8 +258,8 @@
       (let ((conn-id (gethash conn-obj *connection->id*)))
         (log:error "Error event processed in handler-error - ~A." err)
         (when conn-id
-          (remove-connection conn-id conn-obj))
-        (websocket-driver:close-connection conn-obj))
+          (remove-connection conn-id)
+        (websocket-driver:close-connection conn-obj)))
     (condition (c)
       (log:error "Condition caught in handle-error - ~A." c)
       (values 0 c))))
@@ -299,7 +271,7 @@
       (let ((conn-id (gethash conn-obj *connection->id*)))
         (when conn-id
           (log:info "Connection <~A> has closed. ~A." conn-id conn-obj)
-          (remove-connection conn-id conn-obj)))
+          (remove-connection conn-id)))
     (condition (c)
       (log:error "Condition caught in handle-close-connection - ~A." c)
       (values 0 c))))
