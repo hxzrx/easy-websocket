@@ -334,10 +334,11 @@
        'echo-message-serialized
        'handle-error
        'handle-close-connection
+       :uri "/ws"
        :server :hunchentoot)
 
 #+:ignore
-(easy-websocket:with-client client "ws://127.0.0.1:8080" #'(lambda (message)
+(easy-websocket:with-client client "ws://127.0.0.1:8080/ws" #'(lambda (message)
                                                              (format t "~&Client received: ~A~%" message))
   (easy-websocket:send client "Hello server!")
   (sleep 0.1)) ; sleep so that the msg will be printed

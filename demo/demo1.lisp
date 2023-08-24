@@ -323,6 +323,7 @@
        'echo-message
        'handle-error
        'handle-close-connection
+       :uri "/ws"
        :server :hunchentoot)
 
 (easy-websocket:with-client client "ws://127.0.0.1:8080/ws" #'(lambda (message)
