@@ -28,7 +28,7 @@
                 :serial t
                 :components ((:file "packages")
                              (:file "utils")
-                             (:file "demo1")
+                             (:file "server")
                              (:file "websocket")
                              )))
   :perform (test-op (o s) (uiop:symbol-call :parachute :test :easy-websocket-tests)))
