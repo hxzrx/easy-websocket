@@ -1,17 +1,12 @@
 (in-package :easy-websocket)
 
 
-;;; Special vars
-
 (defvar *app* nil
   "App middleware of Clack")
 
 (defvar *handler* nil
   "Http handler of Clack")
 
-
-;;; Server
-;;; clog-server
 (defun handle-websocket-connection (on-open-handler on-message-handler on-error-handler on-close-handler env)
   "Setup websocket server on ENV with OPEN, MESSAGE, ERROR and CLOSE handlers."
   (handler-case
@@ -55,7 +50,6 @@
       (log:error "Websocket connection handler failed when initializing the server with condition <~A>" c)
       (values 0 c))))
 
-;; initialize
 (defun start (on-open-handler
               on-message-handler
               on-error-handler
@@ -66,6 +60,8 @@
                 (port    8080)
                 (server  :hunchentoot)
                 (workers 2)
+                request-verifier
+                http-handler
               &allow-other-keys)
   "Builds a clack app and then starts the webserver.
 Only websocket requests are allowed, which have upgrade/websocket record in the headers table,
@@ -79,9 +75,7 @@ host: the address this server will listen to.
 port: the port opened by this server
 server: can be one of :hunchentoot, :woo, :wookie, default to :hunchentoot, bugs occurred for others.
 workers: the count of threads which will be used to fork the workers of the webserver.
-
-furthermore, there are two additional keyword argument can be passed.
-verifier: a unary function and pass env to check the request. This function will be called if it's provided.
+request-verifier: a unary function and pass env to check the request. This function will be called if it's provided.
 http-handler: a unary function and pass env to serve the normal http requests. This function will be called if it's provided.
 
 on-open-handler, on-error-handler and on-close-handler can be nil to ignore the respect events.
@@ -99,16 +93,16 @@ however, this will not cache for HUNCHENTOOT.
                    (let ((headers (getf env :headers)))
                      (if (equal "websocket" (gethash "upgrade" headers))
                          ;; check if there's a request verify function in the args
-                         (alexandria:if-let (verify-request (getf args :verifier))
+                         (if request-verifier
                            ;; the url has the fmt such as "ws://localhost/ws?r=conn_id" where conn_id should be verified
-                           (if (funcall verify-request env)
+                           (if (funcall request-verifier env)
                                (funcall app env)
                                (prog1 '(403 (:content-type "text/plain") ("403 Forbidden!"))
                                  (log:warn "Failed to verify the websocket connection request.")))
                            (funcall app env))
                          ;; this server doesn't deserve to serve http requests,
                          ;; however, the http-handler parameter gives a chance to serve normal http requests.
-                         (alexandria:if-let (http-handler (getf args :http-handler))
+                         (if http-handler
                            (funcall http-handler env)
                            (prog1 '(403 (:content-type "text/plain") ("403 Forbidden!")) ; forbide other requests than websocket
                              (log:warn "The client tried to make a normal http connection to this websocket server.")))))))
@@ -156,6 +150,6 @@ It seems that the server could not listen to the close event!
                           ,on-message-handler)
      (websocket-driver:start-connection ,client)
      (unwind-protect  (progn ,@body)
-       ;; close-connection did not send close frame to the server
-       (websocket-driver.ws.base::send-close-frame ,client "" 1000) ;(websocket-driver:send ,client "" :type :close)
+       ;; close-connection did not send close frame to the server, the close event cannot be sent by emit
+       (websocket-driver.ws.base::send-close-frame ,client "" 1000) ; or (websocket-driver:send ,client "" :type :close)
        (websocket-driver:close-connection ,client))))
