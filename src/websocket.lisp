@@ -139,7 +139,7 @@ however, this will not cache for HUNCHENTOOT.
                          :use-default-middlewares nil
                          :worker-num workers
                          (delete-from-plist args :server :address :port :debug :use-default-middlewares :worker-num)))
-  (log:info "Websocket server started at address \"ws://~A:~A\" with ~d workers." host port workers)
+  (log:info "Websocket server started at address \"ws://~A:~A~@[~d~]\" with ~d workers." host port uri workers)
   *handler*)
 
 (defmacro stop (&body cleanup)
