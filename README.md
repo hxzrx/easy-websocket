@@ -12,7 +12,7 @@ There is a full demo in the file `src/example.lisp`. Most of the server code wer
 
 ## APIs
 
-### \[Function] `(start on-open-handler on-message-handler on-error-handler on-close-handler &rest args &key (host "0.0.0.0") (port 8080) (server  :hunchentoot) (workers 2) &allow-other-keys)`
+### \[Function] `(start on-open-handler on-message-handler on-error-handler on-close-handler &rest args &key (host "0.0.0.0") (port 8080) (uri "/ws") (server  :hunchentoot) (workers 2) request-verifier http-handler &allow-other-keys)`
 
 Builds a `clack` app and then starts the webserver. Only websocket requests are allowed, which have upgrade/websocket record in the headers table, all other requests will be responded with code 403.
 
@@ -24,13 +24,17 @@ Builds a `clack` app and then starts the webserver. Only websocket requests are 
 
 * `on-close-handler`:   function, accepts conn-obj as its argument, used to listen to the close event.
 
-* `host`: the address this server will listen to.
+* `host`: string, the address this server will listen to.
 
-* `port`: the port opened by this server
+* `port`: string, the port opened by this server
+
+* `uri`: string or NULL, the requested uri should match this arg if it's not null, case insensitive.
 
 * `server`: can be one of :hunchentoot, :woo, :wookie, default to :hunchentoot, bugs occurred for others.
 
 * `workers`: the count of threads which will be used to fork the workers of the webserver.
+
+* `request-verifier`: function or NULL, the function accepts the `env` and check the request, a 403 response will be sent if this check failed. This function will be called if provided.
 
 `on-open-handler`, `on-error-handler` and `on-close-handler` can be nil to ignore the respect events.
 
