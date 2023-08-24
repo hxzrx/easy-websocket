@@ -7,6 +7,25 @@
 (defvar *handler* nil
   "Http handler of Clack")
 
+;; completely copied from alexandria
+(defun delete-from-plist (plist &rest keys)
+  "Just like REMOVE-FROM-PLIST, but this version may destructively modify the
+provided PLIST."
+  (declare (optimize speed))
+  (loop with head = plist
+        with tail = nil   ; a nil tail means an empty result so far
+        for (key . rest) on plist by #'cddr
+        do (assert rest () "Expected a proper plist, got ~S" plist)
+           (if (member key keys :test #'eq)
+               ;; skip over this pair
+               (let ((next (cdr rest)))
+                 (if tail
+                     (setf (cdr tail) next)
+                     (setf head next)))
+               ;; keep this pair
+               (setf tail rest))
+        finally (return head)))
+
 (defun handle-websocket-connection (on-open-handler on-message-handler on-error-handler on-close-handler env)
   "Setup websocket server on ENV with OPEN, MESSAGE, ERROR and CLOSE handlers."
   (handler-case
@@ -58,6 +77,7 @@
               &key
                 (host    "0.0.0.0")
                 (port    8080)
+                (uri     "/ws")
                 (server  :hunchentoot)
                 (workers 2)
                 request-verifier
@@ -73,6 +93,7 @@ on-error-handler:   function, accepts an error object as its argument, used to h
 on-close-handler:   function, accepts conn-obj as its argument, used to listen to the close event.
 host: the address this server will listen to.
 port: the port opened by this server
+uri: if not NULL, the request uri should match this arg, case insensitive.
 server: can be one of :hunchentoot, :woo, :wookie, default to :hunchentoot, bugs occurred for others.
 workers: the count of threads which will be used to fork the workers of the webserver.
 request-verifier: a unary function and pass env to check the request. This function will be called if it's provided.
@@ -88,24 +109,28 @@ however, this will not cache for HUNCHENTOOT.
                ;; filter request
                (lambda (app)
                  (lambda (env)
-                   (log:info "A remote host \"~d:~d\" tries to make a \"~d\" request for uri \"~d\"."
-                             (getf env :REMOTE-ADDR) (getf env :REMOTE-PORT) (getf env :URL-SCHEME) (getf env :REQUEST-URI))
-                   (let ((headers (getf env :headers)))
-                     (if (equal "websocket" (gethash "upgrade" headers))
-                         ;; check if there's a request verify function in the args
-                         (if request-verifier
-                           ;; the url has the fmt such as "ws://localhost/ws?r=conn_id" where conn_id should be verified
-                           (if (funcall request-verifier env)
-                               (funcall app env)
-                               (prog1 '(403 (:content-type "text/plain") ("403 Forbidden!"))
-                                 (log:warn "Failed to verify the websocket connection request.")))
-                           (funcall app env))
-                         ;; this server doesn't deserve to serve http requests,
-                         ;; however, the http-handler parameter gives a chance to serve normal http requests.
-                         (if http-handler
-                           (funcall http-handler env)
-                           (prog1 '(403 (:content-type "text/plain") ("403 Forbidden!")) ; forbide other requests than websocket
-                             (log:warn "The client tried to make a normal http connection to this websocket server.")))))))
+                   (log:info "A remote host \"~d:~d\" tries to make request for uri \"~d\"."
+                             (getf env :REMOTE-ADDR) (getf env :REMOTE-PORT) (getf env :REQUEST-URI))
+                   (if (and uri (not (string-equal uri (getf env :REQUEST-URI)))) ; verify uri, case insensitive
+                       (prog1 '(400 (:content-type "text/plain") ("404 Not Found!"))
+                         (log:warn "A remote host \"~d\" tried to make a request but with invalid uri \"~d\"."
+                                   (getf env :REMOTE-ADDR) (getf env :REQUEST-URI)))
+                       (let ((headers (getf env :headers)))
+                         (if (equal "websocket" (gethash "upgrade" headers))
+                             ;; check if there's a request verify function in the args
+                             (if request-verifier
+                                 ;; the url has the fmt such as "ws://localhost/ws?r=conn_id" where conn_id should be verified
+                                 (if (funcall request-verifier env)
+                                     (funcall app env)
+                                     (prog1 '(403 (:content-type "text/plain") ("403 Forbidden!"))
+                                       (log:warn "Failed to verify the websocket connection request.")))
+                                 (funcall app env))
+                             ;; this server doesn't deserve to serve http requests,
+                             ;; however, the http-handler parameter gives a chance to serve normal http requests.
+                             (if http-handler
+                                 (funcall http-handler env)
+                                 (prog1 '(403 (:content-type "text/plain") ("403 Forbidden!")) ; forbide other requests than websocket
+                                   (log:warn "The client tried to make a normal http connection to this websocket server."))))))))
                ;; handle websocket
                (lambda (env)
                  (handle-websocket-connection on-open-handler on-message-handler on-error-handler on-close-handler env))))
@@ -117,8 +142,8 @@ however, this will not cache for HUNCHENTOOT.
                          :debug nil
                          :use-default-middlewares nil
                          :worker-num workers
-                         (alexandria:delete-from-plist args :server :address :port :debug :use-default-middlewares :worker-num)))
-  (log:info "Websocket server started at address \"~A:~A\" with ~d workers." host port workers)
+                         (delete-from-plist args :server :address :port :debug :use-default-middlewares :worker-num)))
+  (log:info "Websocket server started at address \"ws://~A:~A\" with ~d workers." host port workers)
   *handler*)
 
 (defmacro stop (&body cleanup)
