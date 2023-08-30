@@ -77,7 +77,7 @@ provided PLIST."
               &key
                 (host    "0.0.0.0")
                 (port    8080)
-                (uri     "/ws")
+                (path    "/ws")
                 (server  :hunchentoot)
                 (workers 2)
                 request-verifier
@@ -92,7 +92,7 @@ on-error-handler:   function, accepts an error object as its argument, used to h
 on-close-handler:   function, accepts conn-obj as its argument, used to listen to the close event.
 host: the address this server will listen to.
 port: the port opened by this server
-uri: if not NULL, the requested uri should match this arg, case insensitive.
+path: if not NULL, the requested path should match this arg, case insensitive.
 server: can be one of :hunchentoot, :woo, :wookie, default to :hunchentoot, bugs occurred for others.
 workers: the count of threads which will be used to fork the workers of the webserver.
 request-verifier: function or NULL, the function accepts the `env` and check the request, a 403 response will be sent if this check failed. This function will be called if provided.
@@ -109,11 +109,11 @@ however, this will not cache for HUNCHENTOOT.
                  (lambda (env)
                    (log:info "A remote host \"~d:~d\" tries to make request for uri \"~d\"."
                              (getf env :REMOTE-ADDR) (getf env :REMOTE-PORT) (getf env :REQUEST-URI))
-                   ;; verify uri, case insensitive
-                   (if (and uri (not (string-equal uri (getf env :REQUEST-URI))))
+                   ;; verify path, case insensitive
+                   (if (and path (not (string-equal path (getf env :PATH-INFO))))
                        (prog1 '(400 (:content-type "text/plain") ("404 Not Found!"))
-                         (log:warn "A remote host \"~d\" tried to make a request but with invalid uri \"~d\"."
-                                   (getf env :REMOTE-ADDR) (getf env :REQUEST-URI)))
+                         (log:warn "A remote host \"~d\" tried to make a request but with invalid path \"~d\"."
+                                   (getf env :REMOTE-ADDR) (getf env :PATH-INFO)))
                        ;; verify websocket request
                        (if (equal "websocket" (gethash "upgrade" (getf env :headers)))
                            ;; the url has the fmt such as "ws://localhost/ws?r=conn_id" where conn_id should be verified
@@ -138,7 +138,7 @@ however, this will not cache for HUNCHENTOOT.
                          :use-default-middlewares nil
                          :worker-num workers
                          (delete-from-plist args :server :address :port :debug :use-default-middlewares :worker-num)))
-  (log:info "Websocket server started at address \"ws://~A:~A~@[~d~]\" with ~d workers." host port uri workers)
+  (log:info "Websocket server started at address \"ws://~A:~A~@[~d~]\" with ~d workers." host port path workers)
   *handler*)
 
 (defmacro stop (&body cleanup)
